@@ -19,7 +19,7 @@ const double xmin = -2.5;
 const double xmax = 1;
 const double ymin = -1;
 const double ymax = 1;
-const int iterations = 40;
+const int iterations = 60;
 const int orbit_iterations = 5;
 
 // 0 for kmeans
@@ -51,7 +51,7 @@ std::optional<int> mandelbrot(float x, float y) {
 	#elif MODE == 1
 	// assume all periods are less than 10
 	std::vector<std::complex<float>> seed_points;
-	for(int i = 0; i < 10; i++) {
+	for(int i = 0; i < 20; i++) {
 		z = z * z + c;
 		if(std::norm(z) > 4) {
 			return {};
@@ -67,12 +67,12 @@ std::optional<int> mandelbrot(float x, float y) {
 		}
 	}
 	// iterate until threshold passed
-	float threshold = min_distance / 2;
-	int X = 40;
+	float threshold = min_distance;
+	//int X = 40;
 	while(true) {
 		z = z * z + c;
 		if(std::norm(z) > 4) {
-			return -1; //{};
+			return {};
 		}
 		for(let const [i, point] : enumerate(reverse_iter(seed_points))) {
 			if(std::abs(point - z) <= threshold) {
@@ -80,7 +80,7 @@ std::optional<int> mandelbrot(float x, float y) {
 			}
 		}
 		seed_points.push_back(z);
-		if(X-- == 0) break; // TODO
+		//if(X-- == 0) break; // TODO
 	}
 	assert(false);
 	return -1;
