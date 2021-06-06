@@ -53,6 +53,7 @@ std::optional<int> mandelbrot(fp x, fp y) {
 	#elif MODE == 1
 	// assume all periods are less than 10
 	std::vector<std::complex<fp>> seed_points;
+	for(int i = 0; i < 40; i++) {
 		z = z * z + c;
 		if(std::norm(z) > 4) {
 			return {};
@@ -62,22 +63,25 @@ std::optional<int> mandelbrot(fp x, fp y) {
 	fp min_distance = INFINITY;
 	for(std::size_t i = 0; i < seed_points.size(); i++) {
 		for(std::size_t j = i + 1; j < seed_points.size(); j++) {
-			if(std::abs(seed_points[i] - seed_points[j]) < min_distance) {
-				min_distance = std::abs(seed_points[i] - seed_points[j]);
+			let d = std::abs(seed_points[i] - seed_points[j]);
+			if(d < min_distance) {
+				min_distance = d;
 			}
 		}
 	}
 	// iterate until threshold passed
-	fp threshold = min_distance;
+	fp threshold = min_distance;// * 0.75;
 	//int X = 40;
 	while(true) {
 		z = z * z + c;
 		if(std::norm(z) > 4) {
 			return {};
 		}
-		for(let const [i, point] : enumerate(reverse_iter(seed_points))) {
-			if(std::abs(point - z) <= threshold) {
-				return i;
+		for(int i = (int)seed_points.size() - 1, count = 0; i >= 0; i--, count++) {
+			if(std::abs(seed_points[i] - z) <= threshold) {
+		//for(let const [count, point] : enumerate(reverse_iter(seed_points))) {
+		//	if(std::abs(point - z) <= threshold) {
+				return count /* + 1 */;
 			}
 		}
 		seed_points.push_back(z);
