@@ -31,7 +31,7 @@ ifeq ($(TARGET), debug)
 		LDFLAGS += -fsanitize=address
 	endif
 else ifeq ($(TARGET), release)
-	CFLAGS = -O3 -funroll-loops -ftree-vectorize -ffast-math -flto -march=native #-DNDEBUG
+	CFLAGS = -O3 -funroll-loops -ftree-vectorize -ffast-math -flto -march=native -DNDEBUG
 	LDFLAGS = -s
 endif
 
@@ -64,8 +64,6 @@ screenshots: $(PNGS)
 
 $(SCREENSHOTS)/%.png: SHELL:= bash
 $(SCREENSHOTS)/%.png: $(SCREENSHOTS)/%.bmp
-	#@echo $@
-	bash -c "echo $SHELL"
 	bash -c "convert $^ $@"
 
 .PHONY: clean

@@ -13,13 +13,15 @@
 #include "bmp.h"
 #include "kmeans.h"
 
+typedef float fp;
+
 const int w = 1920;
 const int h = 1080;
-const double xmin = -2.5;
-const double xmax = 1;
-const double ymin = -1;
-const double ymax = 1;
-const int iterations = 60;
+const fp xmin = -2.5;
+const fp xmax = 1;
+const fp ymin = -1;
+const fp ymax = 1;
+const int iterations = 5000;
 const int orbit_iterations = 5;
 
 // 0 for kmeans
@@ -27,10 +29,10 @@ const int orbit_iterations = 5;
 #define MODE 1
 
 // returns cycles in orbit or none if the point is outside the set
-std::optional<int> mandelbrot(float x, float y) {
+std::optional<int> mandelbrot(fp x, fp y) {
 	using namespace std::complex_literals;
-	std::complex<float> c = std::complex<float>(x, y);
-	std::complex<float> z = std::complex<float>(0, 0);
+	std::complex<fp> c = std::complex<fp>(x, y);
+	std::complex<fp> z = std::complex<fp>(0, 0);
 	int n = iterations;
 	while(n-- && std::norm(z) < 4) {
 		z = z * z + c;
@@ -39,7 +41,7 @@ std::optional<int> mandelbrot(float x, float y) {
 		return {};
 	}
 	#if MODE == 0
-	std::vector<std::complex<float>> points;
+	std::vector<std::complex<fp>> points;
 	points.reserve(orbit_iterations);
 	int n = orbit_iterations;
 	while(n-- && std::norm(z) < 4) {
@@ -50,15 +52,14 @@ std::optional<int> mandelbrot(float x, float y) {
 	return clusters.size();
 	#elif MODE == 1
 	// assume all periods are less than 10
-	std::vector<std::complex<float>> seed_points;
-	for(int i = 0; i < 20; i++) {
+	std::vector<std::complex<fp>> seed_points;
 		z = z * z + c;
 		if(std::norm(z) > 4) {
 			return {};
 		}
 		seed_points.push_back(z);
 	}
-	float min_distance = INFINITY;
+	fp min_distance = INFINITY;
 	for(std::size_t i = 0; i < seed_points.size(); i++) {
 		for(std::size_t j = i + 1; j < seed_points.size(); j++) {
 			if(std::abs(seed_points[i] - seed_points[j]) < min_distance) {
@@ -67,7 +68,7 @@ std::optional<int> mandelbrot(float x, float y) {
 		}
 	}
 	// iterate until threshold passed
-	float threshold = min_distance;
+	fp threshold = min_distance;
 	//int X = 40;
 	while(true) {
 		z = z * z + c;
@@ -96,9 +97,9 @@ int main() {
 	//};
 	for(int j = 0; j <= h / 2; j++) {
 		for(int i = 0; i < w; i++) {
-			if(i % 100 == 0) printf("\033[1K\r%0.2f%% %0.2f%%", (float)(i + j * w) / (w * h) * 100, (float)i / w * 100);
-			float x = xmin + ((float)i / w) * (xmax - xmin);
-			float y = ymin + ((float)j / h) * (ymax - ymin);
+			if(i % 100 == 0) printf("\033[1K\r%0.2f%% %0.2f%%", (fp)(i + j * w) / (w * h) * 100, (fp)i / w * 100);
+			fp x = xmin + ((fp)i / w) * (xmax - xmin);
+			fp y = ymin + ((fp)j / h) * (ymax - ymin);
 			if(let result = mandelbrot(x, y)) {
 				let period = result.value();
 				if(period > 255 / 20) {
