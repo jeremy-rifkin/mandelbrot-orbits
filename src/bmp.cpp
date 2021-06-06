@@ -25,12 +25,12 @@ void BMP::write() {
 	let* file = fopen(path, "wb");
 	// setup header
 	header_t header;
-	header.info_header.size_of_image_data = 24 * width * height; // no rounding needed
+	header.info_header.size_of_image_data = 3 * width * height; // no rounding needed
 	let padding = (width * 3) % 4;
 	if(padding > 0) {
 		padding = 4 - padding;
 	}
-	header.file_size = header.info_header.size_of_header + header.info_header.size_of_image_data + padding * height;
+	header.file_size = sizeof(header_t) + header.info_header.size_of_image_data + padding * height;
 	header.info_header.width = width;
 	header.info_header.height = height;
 	// perform byteswaps
