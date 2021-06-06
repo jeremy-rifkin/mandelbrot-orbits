@@ -72,17 +72,18 @@ std::optional<int> mandelbrot(float x, float y) {
 	while(true) {
 		z = z * z + c;
 		if(std::norm(z) > 4) {
-			return {};
+			return -1; //{};
 		}
 		for(let const [i, point] : enumerate(reverse_iter(seed_points))) {
-			if(std::abs(point - z) < threshold) {
+			if(std::abs(point - z) <= threshold) {
 				return i;
 			}
 		}
 		seed_points.push_back(z);
 		if(X-- == 0) break; // TODO
 	}
-	return 1;
+	assert(false);
+	return -1;
 	#endif
 }
 
@@ -100,8 +101,16 @@ int main() {
 			float y = ymin + ((float)j / h) * (ymax - ymin);
 			if(let result = mandelbrot(x, y)) {
 				let period = result.value();
-				bmp.set(i, j, {(uint8_t)(255 - period * 20), 0, 0});
-				bmp.set(i, h - j - 1, {(uint8_t)(255 - period * 20), 0, 0});
+				if(period > 255 / 20) {
+					period = 255 / 20;
+				}
+				uint8_t v = (uint8_t)(255 - period * 20);
+				pixel_t pixel = {v, v, v};
+				if(period == -1) {
+					pixel = {255, 0, 0};
+				}
+				bmp.set(i, j, pixel);
+				bmp.set(i, h - j - 1, pixel);
 			} else {
 				bmp.set(i, j, {255, 255, 255});
 				bmp.set(i, h - j - 1, {255, 255, 255});

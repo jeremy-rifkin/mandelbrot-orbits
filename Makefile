@@ -54,6 +54,20 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 	$(MKDIR_P) $(dir $@)
 	$(CPP) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
+SCREENSHOTS := screenshots
+BMPS := $(shell find $(SCREENSHOTS) -name "*.bmp")
+PNGS := $(BMPS:.bmp=.png)
+
+.PHONY: screenshots
+
+screenshots: $(PNGS)
+
+$(SCREENSHOTS)/%.png: SHELL:= bash
+$(SCREENSHOTS)/%.png: $(SCREENSHOTS)/%.bmp
+	#@echo $@
+	bash -c "echo $SHELL"
+	bash -c "convert $^ $@"
+
 .PHONY: clean
 
 clean:
