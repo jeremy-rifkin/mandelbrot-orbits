@@ -13,7 +13,7 @@
 #include "bmp.h"
 #include "kmeans.h"
 
-typedef float fp;
+typedef double fp;
 
 const int w = 1920;
 const int h = 1080;
@@ -26,7 +26,8 @@ const int orbit_iterations = 5;
 
 // 0 for kmeans
 // 1 for threshold
-#define MODE 1
+// 2 for fixed threshold
+#define MODE 2
 
 // returns cycles in orbit or none if the point is outside the set
 std::optional<int> mandelbrot(fp x, fp y) {
@@ -89,6 +90,28 @@ std::optional<int> mandelbrot(fp x, fp y) {
 	}
 	assert(false);
 	return -1;
+	#elif MODE == 2
+	{
+		// assume all periods are less than 10
+		std::complex<fp> c = std::complex<fp>(x, y);
+		std::complex<fp> z = std::complex<fp>(0, 0);
+		std::vector<std::complex<fp>> seed_points;
+		const float threshold = 1e-9;
+		int maxx = 10000;
+		while(maxx--) {
+			z = z * z + c;
+			if(std::norm(z) > 4) {
+				return {};
+			}
+			for(int i = (int)seed_points.size() - 1, count = 0; i >= 0; i--, count++) {
+				if(std::abs(seed_points[i] - z) <= threshold) {
+					return count /* + 1 */;
+				}
+			}
+			seed_points.push_back(z);
+		}
+		return -1;
+	}
 	#endif
 }
 
