@@ -31,7 +31,6 @@ const int orbit_iterations = 5;
 
 // returns cycles in orbit or none if the point is outside the set
 std::optional<int> mandelbrot(fp x, fp y) {
-	using namespace std::complex_literals;
 	std::complex<fp> c = std::complex<fp>(x, y);
 	std::complex<fp> z = std::complex<fp>(0, 0);
 	int n = iterations;
@@ -115,7 +114,43 @@ std::optional<int> mandelbrot(fp x, fp y) {
 	#endif
 }
 
+std::string to_string(const std::complex<fp>& c) {
+	return std::to_string(c.real()) + " + " + std::to_string(c.imag()) + "i";
+}
+
+void trace(std::complex<fp> z, const std::complex<fp> c, int n) {
+	for(int i = 0; i < n; i++) {
+		z = z * z + c;
+		printf("z %02d : %s\n", i, to_string(z).c_str());
+	}
+}
+
+std::complex<fp> theta_prime(std::complex<fp> z) {
+	return 2. * z;
+}
+
+void foo(const std::complex<fp> c) {
+	using namespace std::complex_literals;
+	std::complex<fp> z;
+	z = (1. + std::sqrt(1. - 4. * c)) / 2.;
+	printf("start: %s\n", to_string(c).c_str());
+	printf("z    : %s\n", to_string(z).c_str());
+	trace(z, c, 4);
+	printf("t'   : %.2f  (<1?)\n", std::abs(theta_prime(z)));
+	printf("--------------\n");
+	z = (1. - std::sqrt(1. - 4. * c)) / 2.;
+	printf("start: %s\n", to_string(c).c_str());
+	printf("z    : %s\n", to_string(z).c_str());
+	trace(z, c, 4);
+	printf("t'   : %.2f  (<1?)\n", std::abs(theta_prime(z)));
+	printf("--------------\n");
+}
+
 int main() {
+	using namespace std::complex_literals;
+	foo(.1 + .1i); // in the mandelbrot set
+	foo(.1 + .7i); // not in the mandelbrot set
+	return 0;
 	assert(byte_swap(0x11223344) == 0x44332211);
 	assert(byte_swap(pixel_t{0x11, 0x22, 0x33}) == (pixel_t{0x33, 0x22, 0x11}));
 	BMP bmp = BMP("test.bmp", w, h);
