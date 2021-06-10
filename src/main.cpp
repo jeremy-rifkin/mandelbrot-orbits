@@ -23,7 +23,7 @@ const fp ymin = -1;
 const fp ymax = 1;
 const fp dx = (xmax - xmin) / w;
 const fp dy = (ymax - ymin) / h;
-const int iterations = 10000 /*+ 1*/; //5000;
+const int iterations = 10000 * 2; //5000;
 const int orbit_iterations = 5;
 
 // 0 for kmeans
@@ -178,8 +178,8 @@ std::optional<int> mandelbrot(fp x, fp y) {
 	//if(is_period(3, z, c)) {
 	//	return 3;
 	//}
-	//for(int i = 20; i >= 1; i--) {
-	for(int i = 1; i <= 10; i++) {
+	for(int i = 20; i >= 1; i--) {
+	//for(int i = 1; i <= 10; i++) {
 		if(is_period(i, z, c)) {
 			return i;
 		}
