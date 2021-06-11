@@ -7,6 +7,7 @@
 #include <string>
 #include <stdint.h>
 #include <stdio.h>
+#include <thread>
 #include <unordered_set>
 #include <vector>
 
@@ -23,49 +24,20 @@ const fp ymin = -1;
 const fp ymax = 1;
 const fp dx = (xmax - xmin) / w;
 const fp dy = (ymax - ymin) / h;
-const int iterations = 10000 * 2; //5000;
+const int iterations = 7000; //10000 * 2; //5000;
 const int orbit_iterations = 5;
+const bool AA = true;
+const int AA_samples = 10;
+const int max_period = 20;
+
+std::mt19937 rng;
+std::uniform_real_distribution<fp> ux(-dx/2, dx/2);
+std::uniform_real_distribution<fp> uy(-dy/2, dy/2);
 
 // 0 for kmeans
 // 1 for threshold
 // 2 for fixed threshold
 #define MODE 2
-
-/*std::string to_string(const std::complex<fp>& c) {
-	return std::to_string(c.real()) + " + " + std::to_string(c.imag()) + "i";
-}
-
-void trace(std::complex<fp> z, const std::complex<fp> c, int n) {
-	for(int i = 0; i < n; i++) {
-		z = z * z + c;
-		printf("z %02d : %s\n", i, to_string(z).c_str());
-	}
-}
-
-std::complex<fp> theta_prime(std::complex<fp> z) {
-	return 2. * z;
-	using namespace std::complex_literals;
-	foo(.1 + .1i); // in the mandelbrot set
-	foo(.1 + .7i); // not in the mandelbrot set
-	return 0;
-}
-
-void foo(const std::complex<fp> c) {
-	using namespace std::complex_literals;
-	std::complex<fp> z;
-	z = (1. + std::sqrt(1. - 4. * c)) / 2.;
-	printf("start: %s\n", to_string(c).c_str());
-	printf("z    : %s\n", to_string(z).c_str());
-	trace(z, c, 4);
-	printf("t'   : %.2f  (<1?)\n", std::abs(theta_prime(z)));
-	printf("--------------\n");
-	z = (1. - std::sqrt(1. - 4. * c)) / 2.;
-	printf("start: %s\n", to_string(c).c_str());
-	printf("z    : %s\n", to_string(z).c_str());
-	trace(z, c, 4);
-	printf("t'   : %.2f  (<1?)\n", std::abs(theta_prime(z)));
-	printf("--------------\n");
-}*/
 
 std::complex<fp> phi_n(int n, std::complex<fp> z, const std::complex<fp> c) {
 	while(n--) {
@@ -87,7 +59,7 @@ std::complex<fp> lambda(const int n, const std::complex<fp> z, const std::comple
 }
 
 bool is_period(const int n, std::complex<fp> z, const std::complex<fp> c) {
-	for(int i = 0; i < n * 2; i++) {
+	for(int i = 0; i < std::max(n, max_period); i++) {
 		if(std::abs(lambda(n, z, c)) >= 1) {
 			return false;
 		}
@@ -129,11 +101,12 @@ std::optional<int> mandelbrot(fp x, fp y) {
 	std::complex<fp> z = std::complex<fp>(0, 0);
 	int n = iterations;
 	while(n-- && std::norm(z) < 4) {
+		//printf("%f+%fi\n", c.real(), c.imag());
 		z = z * z + c;
 	}
-	//if(std::norm(z) > 4) {
-	//	return {};
-	//}
+	if(std::norm(z) > 4) {
+		return {};
+	}
 	/*
 	 * Algorithm:
 	 * We need to know roots of theta_c^n where n is the exact period of c
@@ -147,12 +120,12 @@ std::optional<int> mandelbrot(fp x, fp y) {
 	//if(std::abs((2. * z) * (2. * (z * z + c))) < 1) { // 2
 	//	return 2;
 	//}
-	//for(int i = 1; i <= 20; i++) {
+	//for(int i = 1; i <= max_period; i++) {
 	//	if(std::abs(lambda(i, z, c)) < 1) {
 	//		return i;
 	//	}
 	//}
-	/*for(int i = 20; i >= 1; i--) {
+	/*for(int i = max_period; i >= 1; i--) {
 		if(std::abs(lambda(i, z, c)) < 1) {
 			return i;
 		}
@@ -178,86 +151,22 @@ std::optional<int> mandelbrot(fp x, fp y) {
 	//if(is_period(3, z, c)) {
 	//	return 3;
 	//}
-	for(int i = 10; i >= 1; i--) {
-	//for(int i = 1; i <= 10; i++) {
+	//for(int i = max_period; i >= 1; i--) {
+	for(int i = 1; i <= max_period; i++) {
 		if(is_period(i, z, c)) {
+			//if(true || std::norm(z) > 4) {
+			//	printf("\n>>%d %f %f+%fi\n", i, std::norm(z), c.real(), c.imag());
+			//	for(int j = 0; j < 5; j++) {
+			//		z = z * z + c;
+			//		printf("\n   - %f\n", std::norm(z));
+			//	}
+			//}
 			return i;
 		}
 	}
+	//assert(false);
 	return {};
-	
-	#if MODE == 0
-	std::vector<std::complex<fp>> points;
-	points.reserve(orbit_iterations);
-	int n = orbit_iterations;
-	while(n-- && std::norm(z) < 4) {
-		z = z * z + c;
-		points.push_back(z);
-	}
-	let clusters = silhouette_find_clusters(points, 1, 10, 1/*10*/);
-	return clusters.size();
-	#elif MODE == 1
-	// assume all periods are less than 10
-	std::vector<std::complex<fp>> seed_points;
-	for(int i = 0; i < 40; i++) {
-		z = z * z + c;
-		if(std::norm(z) > 4) {
-			return {};
-		}
-		seed_points.push_back(z);
-	}
-	fp min_distance = INFINITY;
-	for(std::size_t i = 0; i < seed_points.size(); i++) {
-		for(std::size_t j = i + 1; j < seed_points.size(); j++) {
-			let d = std::abs(seed_points[i] - seed_points[j]);
-			if(d < min_distance) {
-				min_distance = d;
-			}
-		}
-	}
-	// iterate until threshold passed
-	fp threshold = min_distance;// * 0.75;
-	//int X = 40;
-	while(true) {
-		z = z * z + c;
-		if(std::norm(z) > 4) {
-			return {};
-		}
-		for(int i = (int)seed_points.size() - 1, count = 0; i >= 0; i--, count++) {
-			if(std::abs(seed_points[i] - z) <= threshold) {
-		//for(let const [count, point] : enumerate(reverse_iter(seed_points))) {
-		//	if(std::abs(point - z) <= threshold) {
-				return count /* + 1 */;
-			}
-		}
-		seed_points.push_back(z);
-		//if(X-- == 0) break; // TODO
-	}
-	assert(false);
-	return -1;
-	#elif MODE == 2
-	{
-		// assume all periods are less than 10
-		std::complex<fp> c = std::complex<fp>(x, y);
-		std::complex<fp> z = std::complex<fp>(0, 0);
-		std::vector<std::complex<fp>> seed_points;
-		const float threshold = 1e-9;
-		int maxx = 10000;
-		while(maxx--) {
-			z = z * z + c;
-			if(std::norm(z) > 4) {
-				return {};
-			}
-			for(int i = (int)seed_points.size() - 1, count = 0; i >= 0; i--, count++) {
-				if(std::abs(seed_points[i] - z) <= threshold) {
-					return count /* + 1 */;
-				}
-			}
-			seed_points.push_back(z);
-		}
-		return -1;
-	}
-	#endif
+	return 0;
 }
 
 __attribute__((optimize("O1"))) // don't want ffast-math messing with this particular computation
@@ -265,7 +174,51 @@ std::tuple<fp, fp> get_coordinates(int i, int j) {
 	return {xmin + ((fp)i / w) * (xmax - xmin), ymin + ((fp)j / h) * (ymax - ymin)};
 }
 
+pixel_t get_pixel(fp x, fp y) {
+	if(let result = mandelbrot(x, y)) {
+		let period = result.value();
+		assert(period >= 0);
+		pixel_t pixel;
+		///if(period > 3) {
+		///	pixel = {233, 72, 236};
+		///} else {
+		///	pixel = colors[period];
+		///}
+		if(period > max_period) {
+			pixel = {255, 0, 0};
+		} else {
+			uint8_t v = 10 * period;
+			pixel = {v, v, v};
+		}
+		return pixel;
+		//bmp.set(i, j, pixel);
+		//bmp.set(i, h - j - 1, pixel);
+	} else {
+		//bmp.set(i, j, {255, 255, 255});
+		//bmp.set(i, h - j - 1, {255, 255, 255});
+		return {255, 255, 255};
+	}
+}
+
+pixel_t sample(fp x, fp y) {
+	if(AA) {
+		int r = 0, g = 0, b = 0;
+		for(int i = 0; i < AA_samples; i++) {
+			let color = get_pixel(x + ux(rng), y + uy(rng));
+			r += color.r;
+			g += color.g;
+			b += color.b;
+		}
+		return {(uint8_t)((fp)r/AA_samples), (uint8_t)((fp)g/AA_samples), (uint8_t)((fp)b/AA_samples)};
+	} else {
+		return get_pixel(x, y);
+	}
+}
+
 int main() {
+	///let p = mandelbrot(0.234375, 1);
+	///printf("%d %d", !!p, *p);
+	///return 0;
 	assert(byte_swap(0x11223344) == 0x44332211);
 	assert(byte_swap(pixel_t{0x11, 0x22, 0x33}) == (pixel_t{0x33, 0x22, 0x11}));
 	BMP bmp = BMP("test.bmp", w, h);
@@ -279,31 +232,19 @@ int main() {
 	//}
 	//return 1;
 	//for(int j = 0; j <= h / 2; j++) {
-	pixel_t colors[] = {
-		{0, 0, 0},
-		{248, 86, 86},
-		{96, 236, 149},
-		{72, 144, 236},
-	};
+	//[[maybe_unused]] pixel_t colors[] = {
+	//	{0, 0, 0},
+	//	{248, 86, 86},
+	//	{96, 236, 149},
+	//	{72, 144, 236},
+	//};
 	for(int j = 0; j < h; j++) {
 		for(int i = 0; i < w; i++) {
 			if(i % 100 == 0) printf("\033[1K\r%0.2f%% %0.2f%%", (fp)(i + j * w) / (w * h) * 100, (fp)i / w * 100);
+			if(i % 100 == 0) fflush(stdout);
 			let [x, y] = get_coordinates(i, j);
-			if(let result = mandelbrot(x, y)) {
-				let period = result.value();
-				pixel_t pixel;
-				///if(period > 3) {
-				///	pixel = {233, 72, 236};
-				///} else {
-				///	pixel = colors[period];
-				///}
-				pixel = {(uint8_t)(20 * period), (uint8_t)(20 * period), (uint8_t)(20 * period)};
-				bmp.set(i, j, pixel);
-				//bmp.set(i, h - j - 1, pixel);
-			} else {
-				bmp.set(i, j, {255, 255, 255});
-				//bmp.set(i, h - j - 1, {255, 255, 255});
-			}
+			let color = sample(x, y);
+			bmp.set(i, j, color);
 		}
 		//bmp.write(); // debug stuff
 	}
