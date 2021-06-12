@@ -106,4 +106,9 @@ inline std::tuple<uint8_t, uint8_t, uint8_t> hsl_to_rgb(float h, float s, float 
 	return {round(r * 255), round(g * 255), round(b * 255)};
 }
 
+// ceiling division
+template<typename T> T cdiv(T x, T y) {
+	return (x + y - 1) / y;
+}
+
 #endif
