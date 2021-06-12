@@ -30,8 +30,21 @@ const bool AA = false;
 const int AA_samples = 10;
 const int max_period = 20;
 
-const float h_start = 187;
-const float h_stop = 277;
+// rng seed 0 works for this
+//const float h_start = 187;
+//const float h_stop = 277;
+// rng seed 2 is good for this
+const float h_start = 200;
+const float h_stop = 330;
+
+pixel_t colors[max_period];
+__attribute__((constructor)) void init_colors() {
+	std::mt19937 rng(2);
+	std::uniform_real_distribution<fp> u(h_start, h_stop);
+	for(int i = 0; i < max_period; i++) {
+		colors[i] = hsl_to_rgb(u(rng), 0.7, 0.5);
+	}
+}
 
 std::mt19937 rng;
 std::uniform_real_distribution<fp> ux(-dx/2, dx/2);
@@ -89,12 +102,12 @@ std::optional<int> mandelbrot(fp x, fp y) {
 	 * Assume we've converged on an attractive fixed point here
 	 * Plug it into multiplier equation and check ...?
 	 */
-	for(int i = 1; i <= max_period; i++) {
-		if(is_period(i, z, c)) {
-			return i;
+	for(int p = 1; p <= max_period; p++) {
+		if(is_period(p, z, c)) {
+			return p;
 		}
 	}
-	return {};
+	return 0;
 }
 
 __attribute__((optimize("O1"))) // don't want ffast-math messing with this particular computation
@@ -106,25 +119,14 @@ pixel_t get_pixel(fp x, fp y) {
 	if(let result = mandelbrot(x, y)) {
 		let period = result.value();
 		assert(period >= 0);
-		pixel_t pixel;
-		///if(period > 3) {
-		///	pixel = {233, 72, 236};
-		///} else {
-		///	pixel = colors[period];
-		///}
-		if(period > max_period) {
-			//pixel = {255, 0, 0};
-			pixel = {0, 0, 0};
+		assert(period <= max_period);
+		if(period == 0) {
+			return 0;
 		} else {
-			//uint8_t v = 10 * period;
-			//pixel = {v, v, v};
-			//pixel = hsl_to_rgb(h_start + (h_stop - h_start) / max_period * period, 1, 0.5);
-			pixel = hsl_to_rgb(h_stop + (h_start - h_stop) / max_period * period, 1, 0.5);
-			//pixel = hsl_to_rgb(360 / max_period * period, .7, 0.5);
+			return colors[period - 1];
 		}
-		return pixel;
 	} else {
-		return {255, 255, 255};
+		return 255;
 	}
 }
 
@@ -147,12 +149,6 @@ int main() {
 	assert(byte_swap(0x11223344) == 0x44332211);
 	assert(byte_swap(pixel_t{0x11, 0x22, 0x33}) == (pixel_t{0x33, 0x22, 0x11}));
 	BMP bmp = BMP("test.bmp", w, h);
-	//[[maybe_unused]] pixel_t colors[] = {
-	//	{0, 0, 0},
-	//	{248, 86, 86},
-	//	{96, 236, 149},
-	//	{72, 144, 236},
-	//};
 	for(int j = 0; j < h; j++) {
 		for(int i = 0; i < w; i++) {
 			if(i % 100 == 0) printf("\033[1K\r%0.2f%% %0.2f%%", (fp)(i + j * w) / (w * h) * 100, (fp)i / w * 100);
