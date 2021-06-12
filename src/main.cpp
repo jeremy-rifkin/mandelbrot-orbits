@@ -26,9 +26,12 @@ const fp dx = (xmax - xmin) / w;
 const fp dy = (ymax - ymin) / h;
 const int iterations = 7000; //10000 * 2; //5000;
 const int orbit_iterations = 5;
-const bool AA = true;
+const bool AA = false;
 const int AA_samples = 10;
 const int max_period = 20;
+
+const float h_start = 187;
+const float h_stop = 277;
 
 std::mt19937 rng;
 std::uniform_real_distribution<fp> ux(-dx/2, dx/2);
@@ -110,10 +113,14 @@ pixel_t get_pixel(fp x, fp y) {
 		///	pixel = colors[period];
 		///}
 		if(period > max_period) {
-			pixel = {255, 0, 0};
+			//pixel = {255, 0, 0};
+			pixel = {0, 0, 0};
 		} else {
-			uint8_t v = 10 * period;
-			pixel = {v, v, v};
+			//uint8_t v = 10 * period;
+			//pixel = {v, v, v};
+			//pixel = hsl_to_rgb(h_start + (h_stop - h_start) / max_period * period, 1, 0.5);
+			pixel = hsl_to_rgb(h_stop + (h_start - h_stop) / max_period * period, 1, 0.5);
+			//pixel = hsl_to_rgb(360 / max_period * period, .7, 0.5);
 		}
 		return pixel;
 	} else {

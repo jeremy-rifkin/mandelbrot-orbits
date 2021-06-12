@@ -3,11 +3,16 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <tuple>
 
 #include "utils.h"
 
 struct pixel_t {
 	uint8_t r, g, b;
+	pixel_t() = default;
+	pixel_t(uint8_t v) : r(v), g(v), b(v) {}
+	pixel_t(uint8_t r, uint8_t g, uint8_t b) : r(r), g(g), b(b) {}
+	pixel_t(std::tuple<uint8_t, uint8_t, uint8_t> c) : r(std::get<0>(c)), g(std::get<1>(c)), b(std::get<2>(c)) {}
 	bool operator==(const pixel_t&) const;
 }; static_assert(sizeof(pixel_t) == 3);
 

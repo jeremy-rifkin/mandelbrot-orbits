@@ -2,9 +2,10 @@
 #define UTILS_H
 
 #include <limits>
+#include <math.h>
 #include <utility>
-#include <vector>
 #include <unordered_set>
+#include <vector>
 
 #define let auto
 
@@ -70,45 +71,39 @@ template<typename T> std::size_t count_unique(const std::vector<T>& vec) {
 	}
 }
 
-template<typename T> struct reverse_iter {
-	decltype(std::declval<T>().rbegin()) _begin;
-	decltype(std::declval<T>().rend()) _end;
-	reverse_iter(T& iterable) : _begin(iterable.rbegin()), _end(iterable.rend()) {}
-	decltype(auto) begin() { return _begin; }
-	decltype(auto) end()   { return _end;   }
-};
-
-template<typename T> class enumerate {
-	decltype(std::declval<T>().begin()) _begin;
-	decltype(std::declval<T>().end()) _end;
-public:
-	enumerate(T&& iterable) : _begin(iterable.begin()), _end(iterable.end()) {}
-	template<typename I> class iterator {
-		I it;
-		int i = 0;
-	public:
-		iterator(I it) : it(it) {}
-		iterator operator++() { let i = *this; operator++(0); return i; }
-		iterator operator++(int) { it++; i++; return *this; }
-		std::pair<const int, decltype(*it)&> operator*() { return {i, *it}; }
-		bool operator==(const iterator& o) { return it == o.it; }
-		bool operator!=(const iterator& o) { return !operator==(o); }
-	};
-	template<typename I> class const_iterator {
-		I it;
-		int i = 0;
-	public:
-		const_iterator(I it) : it(it) {}
-		const_iterator operator++() { let i = *this; operator++(0); return i; }
-		const_iterator operator++(int) { it++; i++; return *this; }
-		std::pair<const int, const decltype(*it)&> operator*() const { return {i, *it}; }
-		bool operator==(const const_iterator& o) const { return it == o.it; }
-		bool operator!=(const const_iterator& o) const { return !operator==(o); }
-	};
-	decltype(auto) begin()       { return iterator(_begin);       }
-	decltype(auto) end()         { return iterator(_end);         }
-	decltype(auto) begin() const { return const_iterator(_begin); }
-	decltype(auto) end()   const { return const_iterator(_end);   }
-};
+// https://stackoverflow.com/questions/2353211/hsl-to-rgb-color-conversion
+/**
+ * Converts an HSL color value to RGB. Conversion formula
+ * adapted from http://en.wikipedia.org/wiki/HSL_color_space.
+ * Assumes s and l are contained in the set [0, 1] and h is [0, 360]
+ * returns r, g, and b in the set [0, 255].
+ *
+ * @param   {number}  h       The hue
+ * @param   {number}  s       The saturation
+ * @param   {number}  l       The lightness
+ * @return  {Array}           The RGB representation
+ */
+inline float hue2rgb(float p, float q, float t){
+	if(t < 0) t += 1;
+	if(t > 1) t -= 1;
+	if(t < 1/6.) return p + (q - p) * 6 * t;
+	if(t < 1/2.) return q;
+	if(t < 2/3.) return p + (q - p) * (2/3. - t) * 6;
+	return p;
+}
+inline std::tuple<uint8_t, uint8_t, uint8_t> hsl_to_rgb(float h, float s, float l){
+	h /= 360;
+	float r, g, b;
+	if(s == 0) {
+		r = g = b = l; // achromatic
+	} else {
+		float q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+		float p = 2 * l - q;
+		r = hue2rgb(p, q, h + 1/3.);
+		g = hue2rgb(p, q, h);
+		b = hue2rgb(p, q, h - 1/3.);
+	}
+	return {round(r * 255), round(g * 255), round(b * 255)};
+}
 
 #endif
