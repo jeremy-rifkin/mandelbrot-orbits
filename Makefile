@@ -15,7 +15,7 @@ DFLAGS := -MMD -MP
 CFLAGS :=
 CPPFLAGS := -std=c++17
 
-LDFLAGS :=
+LDFLAGS := -lpthread
 
 # two targets:
 #  debug (O0, asan, asserts, etc)
@@ -31,8 +31,8 @@ ifeq ($(TARGET), debug)
 		LDFLAGS += -fsanitize=address
 	endif
 else ifeq ($(TARGET), release)
-	CFLAGS = -O3 -funroll-loops -ftree-vectorize -ffast-math -flto -march=native #-DNDEBUG
-	LDFLAGS = -s
+	CFLAGS += -O3 -funroll-loops -ftree-vectorize -ffast-math -flto -march=native #-DNDEBUG
+	LDFLAGS += -s
 endif
 
 CFLAGS += $(WFLAGS) $(DFLAGS)

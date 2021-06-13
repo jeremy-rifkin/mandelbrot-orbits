@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <algorithm>
+#include <atomic>
 #include <complex>
 #include <functional>
 #include <optional>
@@ -47,7 +48,7 @@ __attribute__((constructor)) void init_colors() {
 }
 
 enum class render_mode { brute_force, mariani };
-constexpr render_mode mode = render_mode::mariani;
+constexpr render_mode mode = render_mode::brute_force;
 
 constexpr int border_radius = 5;
 
@@ -275,7 +276,24 @@ void mariani_silver(int i, int j, int w, int h) {
 	}
 }
 
+void brute_force_worker(std::atomic_int* xj, BMP* bmp, int id) {
+	int j;
+	while((j = xj->fetch_add(1, std::memory_order_relaxed)) < h) {
+		if(id == 0) printf("\033[1K\r%0.2f%%", (fp)j / h * 100);
+		if(id == 0) fflush(stdout);
+		for(int i = 0; i < w; i++) {
+			let [x, y] = get_coordinates(i, j);
+			//let m = mandelbrot(x, y);
+			//let color = m ? 0 : 255;
+			let color = sample(x, y);
+			bmp->set(i, j, color);
+		}
+	}
+}
+
 int main() {
+	assert(byte_swap(0x11223344) == 0x44332211);
+	assert(byte_swap(pixel_t{0x11, 0x22, 0x33}) == (pixel_t{0x33, 0x22, 0x11}));
 	// Render pipeline:
 	//   Mariani-silver figures out the mandelbrot main-body
 	//   Edge detection ran to figure out where AA is needed
@@ -283,21 +301,19 @@ int main() {
 	//   Another pass to expose any missing detail as discovered by the AA pass
 	// todo: explore mariani-silver with escape time awareness
 	// todo: parallel mariani-silver
-	assert(byte_swap(0x11223344) == 0x44332211);
-	assert(byte_swap(pixel_t{0x11, 0x22, 0x33}) == (pixel_t{0x33, 0x22, 0x11}));
 	BMP bmp = BMP("test.bmp", w, h);
 	if(mode == render_mode::brute_force) {
-		for(int j = 0; j < h; j++) {
-			for(int i = 0; i < w; i++) {
-				if(i % 100 == 0) printf("\033[1K\r%0.2f%% %0.2f%%", (fp)(i + j * w) / (w * h) * 100, (fp)i / w * 100);
-				if(i % 100 == 0) fflush(stdout);
-				let [x, y] = get_coordinates(i, j);
-				//let m = mandelbrot(x, y);
-				//let color = m ? 0 : 255;
-				let color = sample(x, y);
-				bmp.set(i, j, color);
-			}
+		int threads = std::thread::hardware_concurrency();
+		printf("parallel on %d threads\n", threads);
+		std::vector<std::thread> vec(threads);
+		std::atomic_int j = 0;
+		for(int i = 0; i < threads; i++) {
+			vec[i] = std::thread(brute_force_worker, &j, &bmp, i);
 		}
+		for(let& t : vec) {
+			t.join();
+		}
+		puts("\033[1K\rfinished");
 	} else {
 		mariani_silver(0, 0, w, h);
 		puts("finished");
