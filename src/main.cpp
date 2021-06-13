@@ -16,26 +16,26 @@
 
 typedef double fp;
 
-const int w = 1920;
-const int h = 1080;
-const fp xmin = -2.5;
-const fp xmax = 1;
-const fp ymin = -1;
-const fp ymax = 1;
-const fp dx = (xmax - xmin) / w;
-const fp dy = (ymax - ymin) / h;
-const int iterations = 7000; //10000 * 2; //5000;
-const int orbit_iterations = 5;
-const bool AA = false;
-const int AA_samples = 10;
-const int max_period = 20;
+constexpr int w = 1920;
+constexpr int h = 1080;
+constexpr fp xmin = -2.5;
+constexpr fp xmax = 1;
+constexpr fp ymin = -1;
+constexpr fp ymax = 1;
+constexpr fp dx = (xmax - xmin) / w;
+constexpr fp dy = (ymax - ymin) / h;
+constexpr int iterations = 7000; //10000 * 2; //5000;
+constexpr int orbit_iterations = 5;
+constexpr bool AA = false;
+constexpr int AA_samples = 10;
+constexpr int max_period = 20;
 
 // rng seed 0 works for this
 //const float h_start = 187;
 //const float h_stop = 277;
 // rng seed 2 is good for this
-const float h_start = 200;
-const float h_stop = 330;
+constexpr float h_start = 200;
+constexpr float h_stop = 330;
 
 pixel_t colors[max_period];
 __attribute__((constructor)) void init_colors() {
@@ -45,6 +45,11 @@ __attribute__((constructor)) void init_colors() {
 		colors[i] = hsl_to_rgb(u(rng), 0.7, 0.5);
 	}
 }
+
+enum class render_mode { brute_force, mariani };
+constexpr render_mode mode = render_mode::brute_force;
+
+constexpr int border_radius = 5;
 
 std::mt19937 rng;
 std::uniform_real_distribution<fp> ux(-dx/2, dx/2);
@@ -68,6 +73,8 @@ struct point_descriptor {
 
 // memoization
 std::optional<point_descriptor> points[w][h];
+bool ms_mask[w][h];
+bool wtf_mask[w][h];
 
 std::complex<fp> phi_n(int n, std::complex<fp> z, const std::complex<fp> c) {
 	while(n--) {
@@ -164,8 +171,8 @@ pixel_t sample(fp x, fp y) {
 	}
 }*/
 
-pixel_t get_color(int i, int j) {
-	//assert(points[i][j].has_value());
+pixel_t _get_color(int i, int j) {
+	assert(points[i][j].has_value());
 	if(points[i][j].has_value()) {
 		if(points[i][j].value().escape_time.has_value()) {
 			return 255;
@@ -182,14 +189,33 @@ pixel_t get_color(int i, int j) {
 			//return color;
 		}
 	} else {
+		//return {255, 127, 38};
 		return {255, 0, 0};
 	}
 }
 
+pixel_t get_color(int i, int j) {
+	std::vector<pixel_t> values;
+	if(ms_mask[i][j]) values.push_back({255, 127, 38});
+	if(wtf_mask[i][j]) values.push_back({255, 0, 0});
+	values.push_back(_get_color(i, j));
+	int r = 0, g = 0, b = 0;
+	for(let pixel : values) {
+		r += pixel.r;
+		g += pixel.g;
+		b += pixel.b;
+	}
+	int s = values.size();
+	return {(uint8_t)(r/s), (uint8_t)(g/s), (uint8_t)(b/s)};
+}
+
 point_descriptor get_point(int i, int j) {
 	if(points[i][j].has_value()) {
+		//wtf_mask[i][j] = true;
 		return *points[i][j];
 	} else {
+		//assert(!ms_mask[i][j]);
+		//ms_mask[i][j] = true;
 		let [x, y] = get_coordinates(i, j);
 		let m = mandelbrot(x, y);
 		if(m) {
@@ -202,10 +228,22 @@ point_descriptor get_point(int i, int j) {
 }
 
 void mariani_silver(int i, int j, int w, int h) {
-	if(w == 0 || h == 0) return;
+	assert(w >= 0 && h >= 0);
+	//if(w <= 0 || h <= 0) return;
+	if(w <= 4 || h <= 4) {
+		// an optimization but also handling an edge case where i + w/2 - 1 ==== i and cdiv(w, 2) + 1 ==== w
+		for(int x = i; x < i + w; x++) {
+			for(int y = j; y < j + h; y++) {
+				points[x][y] = get_point(x, y);
+			}
+		}
+		return;
+	}
 	std::optional<point_descriptor> pd;
 	bool all_same = true;
 	for(int x = i; x < i + w; x++) {
+		ms_mask[x][j] = true;
+		ms_mask[x][j + h - 1] = true;
 		let d1 = get_point(x, j);
 		let d2 = get_point(x, j + h - 1);
 		if(!pd.has_value()) pd = d1;
@@ -213,6 +251,8 @@ void mariani_silver(int i, int j, int w, int h) {
 		if(*pd != d2) all_same = false;
 	}
 	for(int y = j; y < j + h; y++) {
+		ms_mask[i][y] = true;
+		ms_mask[i + w - 1][y] = true;
 		let d1 = get_point(i, y);
 		let d2 = get_point(i + w - 1, y);
 		if(!pd.has_value()) pd = d1;
@@ -228,14 +268,19 @@ void mariani_silver(int i, int j, int w, int h) {
 			}
 		}
 	} else {
-		mariani_silver(i,       j,       w / 2,      h / 2);
-		mariani_silver(i + w/2, j,       cdiv(w, 2), h / 2);
-		mariani_silver(i,       j + h/2, w / 2,      cdiv(h, 2));
-		mariani_silver(i + w/2, j + h/2, cdiv(w, 2), cdiv(h, 2));
+		mariani_silver(i,           j,           w / 2,          h / 2         );
+		mariani_silver(i + w/2 - 1, j,           cdiv(w, 2) + 1, h / 2         );
+		mariani_silver(i,           j + h/2 - 1, w / 2,          cdiv(h, 2) + 1);
+		mariani_silver(i + w/2 - 1, j + h/2 - 1, cdiv(w, 2) + 1, cdiv(h, 2) + 1);
 	}
 }
 
 int main() {
+	// Render pipeline:
+	//   Mariani-silver figures out the mandelbrot main-body
+	//   
+	// todo: explore mariani-silver with escape time awareness
+	// todo: parallel mariani-silver
 	assert(byte_swap(0x11223344) == 0x44332211);
 	assert(byte_swap(pixel_t{0x11, 0x22, 0x33}) == (pixel_t{0x33, 0x22, 0x11}));
 	BMP bmp = BMP("test.bmp", w, h);
@@ -254,11 +299,39 @@ int main() {
 	puts("finished");
 	for(int i = 0; i < w; i++) {
 		for(int j = 0; j < h; j++) {
+			assert(points[i][j].has_value());
+		}
+	}
+	for(int i = 0; i < w; i++) {
+		for(int j = 0; j < h; j++) {
+			bool center = points[i][j].value().escape_time.has_value();
+			bool has_white = false;
+			bool has_non_white = false;
+			for(int x = std::max(0, i - 1); x <= std::min(w - 1, i + 1); x++) {
+				for(int y = std::max(0, j - 1); y <= std::min(h - 1, j + 1); y++) {
+					if(x == i && y == j) continue;
+					if(points[x][y].value().escape_time.has_value()) {
+						has_white = true;
+					} else {
+						has_non_white = true;
+					}
+					if(has_white && has_non_white) goto b;
+				}
+			}
+			b:
+			if((center && has_non_white) || (!center && has_white))
+			for(int x = std::max(0, i - border_radius); x <= std::min(w - 1, i + border_radius); x++) {
+				for(int y = std::max(0, j - border_radius); y <= std::min(h - 1, j + border_radius); y++) {
+					if((x-i)*(x-i) + (y-j)*(y-j) > border_radius*border_radius) continue;
+					wtf_mask[x][y] = true;
+				}
+			}
+		}
+	}
+	for(int i = 0; i < w; i++) {
+		for(int j = 0; j < h; j++) {
 			bmp.set(i, j, get_color(i, j));
 		}
 	}
 	bmp.write();
 }
-
-// mariani silver
-// can also mirror...
