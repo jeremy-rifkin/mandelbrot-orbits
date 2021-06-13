@@ -107,7 +107,7 @@ bool is_period(const int n, std::complex<fp> z, const std::complex<fp> c) {
 }
 
 // returns cycles in orbit or none if the point is outside the set
-std::optional<int> mandelbrot(fp x, fp y) {
+point_descriptor mandelbrot(fp x, fp y) {
 	/*
 	 * Return none for escapees
 	 * Return positive integer when period is known
@@ -115,12 +115,13 @@ std::optional<int> mandelbrot(fp x, fp y) {
 	 */
 	std::complex<fp> c = std::complex<fp>(x, y);
 	std::complex<fp> z = std::complex<fp>(0, 0);
-	int n = iterations;
-	while(n-- && std::norm(z) < 4) {
+	int i = 0;
+	while(i < iterations && std::norm(z) < 4) {
 		z = z * z + c;
+		i++;
 	}
 	if(std::norm(z) > 4) {
-		return {};
+		return {i, -1};
 	}
 	/*
 	 * Algorithm:
@@ -131,10 +132,10 @@ std::optional<int> mandelbrot(fp x, fp y) {
 	 */
 	for(int p = 1; p <= max_period; p++) {
 		if(is_period(p, z, c)) {
-			return p;
+			return {{}, p};
 		}
 	}
-	return 0;
+	return {{}, 0};
 }
 
 __attribute__((optimize("O1"))) // don't want ffast-math messing with this particular computation
@@ -143,8 +144,8 @@ std::tuple<fp, fp> get_coordinates(int i, int j) {
 }
 
 pixel_t get_pixel(fp x, fp y) {
-	if(let result = mandelbrot(x, y)) {
-		let period = result.value();
+	if(let result = mandelbrot(x, y); !result.escape_time.has_value()) {
+		let period = result.period;
 		assert(period >= 0);
 		assert(period <= max_period);
 		if(period == 0) {
@@ -153,7 +154,7 @@ pixel_t get_pixel(fp x, fp y) {
 			return colors[period - 1];
 		}
 	} else {
-		return 255;
+		return result.escape_time.value() > 100 ? 0 : 255;
 	}
 }
 
@@ -219,12 +220,8 @@ point_descriptor get_point(int i, int j) {
 		//ms_mask[i][j] = true;
 		let [x, y] = get_coordinates(i, j);
 		let m = mandelbrot(x, y);
-		if(m) {
-			points[i][j] = {{}, *m};
-		} else {
-			points[i][j] = {0, 0};
-		}
-		return *points[i][j];
+		points[i][j] = m;
+		return m;
 	}
 }
 
