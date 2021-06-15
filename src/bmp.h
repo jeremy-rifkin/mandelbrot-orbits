@@ -14,10 +14,10 @@ struct pixel_t {
 	pixel_t(uint8_t r, uint8_t g, uint8_t b) : r(r), g(g), b(b) {}
 	pixel_t(std::tuple<uint8_t, uint8_t, uint8_t> c) : r(std::get<0>(c)), g(std::get<1>(c)), b(std::get<2>(c)) {}
 	bool operator==(const pixel_t&) const;
+	bool operator!=(const pixel_t&) const;
 }; static_assert(sizeof(pixel_t) == 3);
 
 class BMP {
-	const char* path;
 	std::size_t width;
 	std::size_t height;
 	/*
@@ -37,12 +37,12 @@ class BMP {
 	2A 4 vertical resolution (can be zero)
 	2E 4 number of colors in palette (can be zero and inferred from bits per pixel)
 	32 4 number of "important" colors (whatever that means) (zero since all colors are important)
-	image data
+	36   image data
 	*/
 	struct header_t {
 		char BM[2] = {'B', 'M'};
 		int32_t file_size;
-		int32_t _reserved_;
+		int32_t _reserved_ = 0;
 		int32_t offset = sizeof(header_t);
 		struct info_header_t {
 			int32_t size_of_header = sizeof(info_header_t);
@@ -62,14 +62,15 @@ class BMP {
 	// note: coords 0,0 are in the bottom left corner
 	pixel_t *data;
 public:
-	BMP(const char*, std::size_t, std::size_t);
+	BMP(std::size_t, std::size_t);
 	BMP(const BMP&) = delete;
 	BMP(BMP&&) = delete;
 	BMP& operator=(const BMP&) = delete;
 	BMP& operator=(BMP&&) = delete;
 	~BMP();
 	void set(int, int, pixel_t);
-	void write();
+	pixel_t get(int, int) const;
+	void write(const char*);
 };
 
 #endif
