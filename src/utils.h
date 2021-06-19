@@ -1,8 +1,13 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <assert.h>
+#include <atomic>
+#include <condition_variable>
 #include <limits>
 #include <math.h>
+#include <mutex>
+#include <queue>
 #include <utility>
 #include <unordered_set>
 #include <vector>
@@ -110,5 +115,117 @@ inline std::tuple<uint8_t, uint8_t, uint8_t> hsl_to_rgb(float h, float s, float 
 template<typename T> T cdiv(T x, T y) {
 	return (x + y - 1) / y;
 }
+
+struct gatekeeper {
+	std::atomic_int count;
+	std::mutex m;
+	std::condition_variable flag; // value does not matter
+	bool done = false;
+	gatekeeper(int n) : count(n) {}
+	void post() { // notify gatekeeper that this thread is done, thread may go on to other work though.
+		if(++count == 0) {
+			// if we're the last thread, we can end it all
+			end();
+		}
+	}
+	//void unpost() {
+	//	count--;
+	//}
+	void wait() {
+		std::unique_lock u {m};
+		flag.wait(u);
+	}
+	void end() {
+		assert(!done); // this should only be called once
+		done = true; // no need to lock
+		flag.notify_all();
+	}
+	void wake_idle_threads() {
+		flag.notify_all(); // todo: only run if count != initial count... ?
+	}
+	bool wait_for_more_work() {
+		// if there's nothing to do at the moment
+		if(++count == 0) {
+			// if we're the last thread, we can end it all
+			end();
+			return false;
+		} else {
+			// if we aren't the last thread, wait
+			// more jobs may be queued
+			wait();
+			count--; // we're no longer waiting
+			if(done) {
+				// if no more work was added, we're done
+				return false;
+			} else {
+				// otherwise back to work
+				return true;
+			}
+		}
+	}
+};
+
+template<typename T> struct parallel_queue {
+	std::queue<T> q;
+	std::mutex m;
+	///std::atomic_int total = 0;
+public:
+	parallel_queue() = default;
+	parallel_queue(const parallel_queue&) = delete;
+	parallel_queue(parallel_queue&&) = delete;
+	parallel_queue& operator=(const parallel_queue&) = delete;
+	parallel_queue& operator=(parallel_queue&&) = delete;
+	void lock() {
+		m.lock();
+	}
+	void unlock() {
+		m.unlock();
+	}
+	void push(T item) {
+		///total++;
+		q.push(item);
+	}
+	[[nodiscard]] T pop() {
+		T r = std::move(q.front()); // todo: why tf can't this be T&&?
+		q.pop();
+		return r;
+	}
+	bool empty() {
+		bool e = q.empty();
+		return e;
+	}
+	std::size_t size() {
+		std::size_t s = q.size();
+		return s;
+	}
+	void atomic_push(T item) {
+		///total++;
+		m.lock();
+		q.push(item);
+		m.unlock();
+	}
+	[[nodiscard]] T atomic_pop() {
+		m.lock();
+		T r = std::move(q.front());
+		q.pop();
+		m.unlock();
+		return r;
+	}
+	bool atomic_empty() {
+		m.lock();
+		bool e = q.empty();
+		m.unlock();
+		return e;
+	}
+	std::size_t atomic_size() {
+		m.lock();
+		std::size_t s = q.size();
+		m.unlock();
+		return s;
+	}
+	///int get_total() {
+	///	return total;
+	///}
+};
 
 #endif
