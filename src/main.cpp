@@ -177,7 +177,7 @@ pixel_t _get_color(int i, int j) {
 	assert(points[i][j].has_value());
 	if(points[i][j].has_value()) {
 		if(points[i][j].value().escape_time.has_value()) {
-			return 255;
+			return points[i][j].value().escape_time.value() > 100 ? 0 : 255; // todo
 		} else {
 			let period = points[i][j].value().period;
 			assert(period >= 0);
