@@ -168,7 +168,6 @@ struct gatekeeper {
 template<typename T> struct parallel_queue {
 	std::queue<T> q;
 	std::mutex m;
-	///std::atomic_int total = 0;
 public:
 	parallel_queue() = default;
 	parallel_queue(const parallel_queue&) = delete;
@@ -182,11 +181,10 @@ public:
 		m.unlock();
 	}
 	void push(T item) {
-		///total++;
 		q.push(item);
 	}
 	[[nodiscard]] T pop() {
-		T r = std::move(q.front()); // todo: why tf can't this be T&&?
+		T r = std::move(q.front());
 		q.pop();
 		return r;
 	}
@@ -199,7 +197,6 @@ public:
 		return s;
 	}
 	void atomic_push(T item) {
-		///total++;
 		m.lock();
 		q.push(item);
 		m.unlock();
@@ -223,9 +220,35 @@ public:
 		m.unlock();
 		return s;
 	}
-	///int get_total() {
-	///	return total;
-	///}
+};
+
+template<typename T> struct atomic_optional {
+	union {
+		T item;
+	};
+	std::atomic_bool _has_value = false;
+	atomic_optional() {}
+	~atomic_optional() {
+		if(_has_value) item.~T();
+	}
+	atomic_optional(const atomic_optional&) = delete;
+	atomic_optional(atomic_optional&&) = delete;
+	atomic_optional& operator=(const atomic_optional&) = delete;
+	atomic_optional& operator=(atomic_optional&&) = delete;
+	bool has_value() {
+		return _has_value;
+	}
+	const T value() {
+		return item;
+	}
+	const T operator*() {
+		return item;
+	}
+	void operator=(T _item) {
+		if(_has_value) item.~T();
+		new (&item) T(_item);
+		_has_value = true; // seq_cst
+	}
 };
 
 #endif
