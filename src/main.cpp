@@ -43,7 +43,7 @@ std::uniform_real_distribution<fp> uy(-dy/2, dy/2);
 enum class render_mode { brute_force, mariani };
 constexpr render_mode mode = render_mode::mariani;
 
-constexpr bool debug_info = true;
+constexpr bool debug_info = false;
 
 // rng seed 0 works for this
 //const float h_start = 187;
@@ -227,115 +227,88 @@ void brute_force_worker(std::atomic_int* xj, BMP* bmp, int id) {
 	}
 }
 
-void mariani_silver_worker(parallel_queue<std::tuple<int, int, int, int>>* _mq, gatekeeper* _gate) {
-	auto T = std::tuple<parallel_queue<std::tuple<int, int, int, int>>&, gatekeeper&> { *_mq, *_gate };
-	auto& [mq, gate] = T;
-	while(true) {
-		while(true) {
-			mq.lock();
-			//printf("%d\n", (int)mq.size());
-			if(!mq.empty()) {
-				let [i, j, w, h] = mq.pop();
-				//printf("%d %d %d %d\n", i, j, w, h);
-				mq.unlock();
-				assert(w >= 0 && h >= 0);
-				if(w <= 4 || h <= 4) {
-					// an optimization but also handling an edge case where i + w/2 - 1 ==== i and cdiv(w, 2) + 1 ==== w
-					for(int x = i; x < i + w; x++) {
-						for(int y = j; y < j + h; y++) {
-							points[x][y] = get_point(x, y);
-						}
-					}
-					continue;
-				}
-				std::optional<point_descriptor> pd;
-				bool all_same = true;
-				for(int x = i; x < i + w; x++) {
-					if(debug_info) ms_mask[x][j] = true;
-					if(debug_info) ms_mask[x][j + h - 1] = true;
-					let d1 = get_point(x, j);
-					let d2 = get_point(x, j + h - 1);
-					if(!pd.has_value()) pd = d1;
-					if(*pd != d1) all_same = false;
-					if(*pd != d2) all_same = false;
-				}
+void mariani_silver_worker(parallel_queue<std::tuple<int, int, int, int>>* _mq) {
+	parallel_queue<std::tuple<int, int, int, int>>& mq = *_mq;
+	while(let job = mq.pop()) {
+		let [i, j, w, h] = *job;
+		//printf("%d %d %d %d\n", i, j, w, h);
+		assert(w >= 0 && h >= 0);
+		if(w <= 4 || h <= 4) {
+			// an optimization but also handling an edge case where i + w/2 - 1 ==== i and cdiv(w, 2) + 1 ==== w
+			for(int x = i; x < i + w; x++) {
 				for(int y = j; y < j + h; y++) {
-					if(debug_info) ms_mask[i][y] = true;
-					if(debug_info) ms_mask[i + w - 1][y] = true;
-					let d1 = get_point(i, y);
-					let d2 = get_point(i + w - 1, y);
-					if(!pd.has_value()) pd = d1;
-					if(*pd != d1) all_same = false;
-					if(*pd != d2) all_same = false;
+					points[x][y] = get_point(x, y);
 				}
-				assert(pd.has_value());
-				if(w > cdiv(::w, 2)) all_same = false; // fixme: hack
-				if(all_same) {
-					for(int x = i + 1; x < i + w - 1; x++) {
-						for(int y = j + 1; y < j + h - 1; y++) {
-							points[x][y] = *pd;
-						}
-					}
-				} else {
-					mq.lock();
-					mq.push(std::tuple<int, int, int, int> {i,           j,           w / 2,          h / 2         });
-					mq.push(std::tuple<int, int, int, int> {i + w/2 - 1, j,           cdiv(w, 2) + 1, h / 2         });
-					mq.push(std::tuple<int, int, int, int> {i,           j + h/2 - 1, w / 2,          cdiv(h, 2) + 1});
-					mq.push(std::tuple<int, int, int, int> {i + w/2 - 1, j + h/2 - 1, cdiv(w, 2) + 1, cdiv(h, 2) + 1});
-					mq.unlock();
-					gate.wake_idle_threads();
-				}
-			} else {
-				mq.unlock();
-				break;
 			}
+			continue;
 		}
-		if(!gate.wait_for_more_work()) return;
+		std::optional<point_descriptor> pd;
+		bool all_same = true;
+		for(int x = i; x < i + w; x++) {
+			if(debug_info) ms_mask[x][j] = true;
+			if(debug_info) ms_mask[x][j + h - 1] = true;
+			let d1 = get_point(x, j);
+			let d2 = get_point(x, j + h - 1);
+			if(!pd.has_value()) pd = d1;
+			if(*pd != d1) all_same = false;
+			if(*pd != d2) all_same = false;
+		}
+		for(int y = j; y < j + h; y++) {
+			if(debug_info) ms_mask[i][y] = true;
+			if(debug_info) ms_mask[i + w - 1][y] = true;
+			let d1 = get_point(i, y);
+			let d2 = get_point(i + w - 1, y);
+			if(!pd.has_value()) pd = d1;
+			if(*pd != d1) all_same = false;
+			if(*pd != d2) all_same = false;
+		}
+		assert(pd.has_value());
+		if(w > cdiv(::w, 2)) all_same = false; // fixme: hack
+		if(all_same) {
+			for(int x = i + 1; x < i + w - 1; x++) {
+				for(int y = j + 1; y < j + h - 1; y++) {
+					points[x][y] = *pd;
+				}
+			}
+		} else {
+			mq.lock();
+			mq.unsync_push(std::tuple<int, int, int, int> {i,           j,           w / 2,          h / 2         });
+			mq.unsync_push(std::tuple<int, int, int, int> {i + w/2 - 1, j,           cdiv(w, 2) + 1, h / 2         });
+			mq.unsync_push(std::tuple<int, int, int, int> {i,           j + h/2 - 1, w / 2,          cdiv(h, 2) + 1});
+			mq.unsync_push(std::tuple<int, int, int, int> {i + w/2 - 1, j + h/2 - 1, cdiv(w, 2) + 1, cdiv(h, 2) + 1});
+			mq.unlock();
+		}
 	}
 }
 
-void AA_worker(BMP* _bmp, parallel_queue<std::pair<int, int>>* _aaq, std::mutex* _maskmutex, gatekeeper* _gate) {
-	auto T = std::tuple<BMP&, parallel_queue<std::pair<int, int>>&,  std::mutex&, gatekeeper&> { *_bmp, *_aaq, *_maskmutex, *_gate };
-	auto& [bmp, aaq, maskmutex, gate] = T;
-	while(true) {
-		while(true) {
-			//printf("aaq: %d %s\n", (int)aaq.size(), aaq.debug_info().c_str());
-			aaq.lock();
-			if(!aaq.empty()) {
-				let [i, j] = aaq.pop();
-				aaq.unlock();
-				let [x, y] = get_coordinates(i, j);
-				let p = sample(x, y);
-				if(p != bmp.get(i, j)) { // no lock needed for reading
-					//let b = bmp.get(i, j);
-					//printf("{%d, %d, %d} != {%d, %d, %d}\n", p.r, p.g, p.b, b.r, b.g, b.b);
-					// no lock needed because only this thread should ever write to this pixel
-					bmp.set(i, j, p);
-					maskmutex.lock();
-					for(int x = std::max(0, i - border_radius); x <= std::min(w - 1, i + border_radius); x++) {
-						for(int y = std::max(0, j - border_radius); y <= std::min(h - 1, j + border_radius); y++) {
-							if((x-i)*(x-i) + (y-j)*(y-j) > border_radius*border_radius) continue;
-							bool do_add = false;
-							if(!aa_mask[x][y]) {
-								do_add = true;
-								aa_mask[x][y] = true;
-							}
-							if(do_add) {
-								aaq.atomic_push({x, y});
-							}
-						}
+void AA_worker(BMP* _bmp, parallel_queue<std::pair<int, int>>* _aaq, std::mutex* _maskmutex) {
+	auto T = std::tuple<BMP&, parallel_queue<std::pair<int, int>>&,  std::mutex&> { *_bmp, *_aaq, *_maskmutex };
+	auto& [bmp, aaq, maskmutex] = T;
+	while(let job = aaq.pop()) {
+		let [i, j] = *job;
+		let [x, y] = get_coordinates(i, j);
+		let p = sample(x, y);
+		if(p != bmp.get(i, j)) { // no lock needed for reading
+			//let b = bmp.get(i, j);
+			//printf("{%d, %d, %d} != {%d, %d, %d}\n", p.r, p.g, p.b, b.r, b.g, b.b);
+			// no lock needed because only this thread should ever write to this pixel
+			bmp.set(i, j, p);
+			maskmutex.lock();
+			for(int x = std::max(0, i - border_radius); x <= std::min(w - 1, i + border_radius); x++) {
+				for(int y = std::max(0, j - border_radius); y <= std::min(h - 1, j + border_radius); y++) {
+					if((x-i)*(x-i) + (y-j)*(y-j) > border_radius*border_radius) continue;
+					bool do_add = false;
+					if(!aa_mask[x][y]) {
+						do_add = true;
+						aa_mask[x][y] = true;
 					}
-					maskmutex.unlock();
+					if(do_add) {
+						aaq.push({x, y});
+					}
 				}
-			} else {
-				aaq.unlock();
-				break;
 			}
-			//if(let s = aaq.atomic_size(); s % 200 == 0) {
-			//	printf("--%d--\n", (int)s);
-			//}
+			maskmutex.unlock();
 		}
-		if(!gate.wait_for_more_work()) return;
 	}
 }
 
@@ -349,7 +322,7 @@ int main() {
 	//   AA pass, parallel
 	//   Another pass to expose any missing detail as discovered by the AA pass
 	BMP bmp = BMP(w, h);
-	const int nthreads = 4; //std::thread::hardware_concurrency();
+	const int nthreads = std::thread::hardware_concurrency();
 	printf("parallel on %d threads\n", nthreads);
 	if(mode == render_mode::brute_force) {
 		puts("starting brute force");
@@ -364,13 +337,11 @@ int main() {
 		puts("\033[1K\rfinished");
 	} else {
 		puts("starting mariani-silver");
-		parallel_queue<std::tuple<int, int, int, int>> mq;
-		mq.push({0, 0, w, h});
-		// each thread will increment the counter when posting at the gate - exit condition is post == 0
-		gatekeeper gate(-nthreads);
+		parallel_queue<std::tuple<int, int, int, int>> mq(nthreads);
+		mq.unsync_push({0, 0, w, h});
 		std::vector<std::thread> thread_pool(nthreads);
 		for(let& t : thread_pool) {
-			t = std::thread(mariani_silver_worker, &mq, &gate);
+			t = std::thread(mariani_silver_worker, &mq);
 		}
 		for(let& t : thread_pool) {
 			t.join();
@@ -385,11 +356,10 @@ int main() {
 		puts("finished color translation");
 		if(AA) {
 			puts("anti-alias enabled, starting anti-alias");
-			parallel_queue<std::pair<int, int>> aaq;
+			parallel_queue<std::pair<int, int>> aaq(nthreads + 1); // +1 for main
 			std::mutex maskmutex;
-			gate.reset_to(-nthreads - 1);
 			for(let& t : thread_pool) {
-				t = std::thread(AA_worker, &bmp, &aaq, &maskmutex, &gate);
+				t = std::thread(AA_worker, &bmp, &aaq, &maskmutex);
 			}
 			for(int i = 0; i < w; i++) {
 				for(int j = 0; j < h; j++) {
@@ -419,16 +389,15 @@ int main() {
 									aa_mask[x][y] = true;
 								}
 								if(do_add) {
-									aaq.atomic_push({x, y});
+									aaq.push({x, y});
 								}
 							}
 						}
 						maskmutex.unlock();
 					}
 				}
-				gate.wake_idle_threads(); // wake any threads which are waiting
 			}
-			gate.post();
+			aaq.extern_post();
 			puts("main posted"); // fixme: debug
 			for(let& t : thread_pool) {
 				t.join();

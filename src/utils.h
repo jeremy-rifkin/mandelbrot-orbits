@@ -116,60 +116,19 @@ template<typename T> T cdiv(T x, T y) {
 	return (x + y - 1) / y;
 }
 
-struct gatekeeper {
-	std::atomic_int count;
-	std::mutex m;
-	std::condition_variable flag; // value does not matter
-	bool done = false;
-	gatekeeper(int n) : count(n) {}
-	void post() { // notify gatekeeper that this thread is done, thread may go on to other work though.
-		if(++count == 0) {
-			// if we're the last thread, we can end it all
-			end();
-		}
-	}
-	//void unpost() {
-	//	count--;
-	//}
-	void wait() {
-		std::unique_lock u {m};
-		flag.wait(u);
-	}
-	void end() {
-		assert(!done); // this should only be called once
-		done = true; // no need to lock
-		flag.notify_all();
-	}
-	void wake_idle_threads() {
-		flag.notify_all(); // todo: only run if count != initial count... ?
-	}
-	bool wait_for_more_work() {
-		// if there's nothing to do at the moment
-		if(++count == 0) {
-			// if we're the last thread, we can end it all
-			end();
-			return false;
-		} else {
-			// if we aren't the last thread, wait
-			// more jobs may be queued
-			wait();
-			count--; // we're no longer waiting
-			if(done) {
-				// if no more work was added, we're done
-				return false;
-			} else {
-				// otherwise back to work
-				return true;
-			}
-		}
-	}
-};
-
+/*
+ * This is a parallel queue designed for multi-producer multi-consumer systems. The parameter `n`
+ * Represents the number of producers + consumers. The queue will be populated with `n` optional
+ * none entries when all producers and consumers finish.
+ */
 template<typename T> struct parallel_queue {
-	std::queue<T> q;
+	std::queue<std::optional<T>> q;
 	std::mutex m;
+	std::condition_variable not_empty;
+	const int initial_count;
+	std::atomic_int count;
 public:
-	parallel_queue() = default;
+	parallel_queue(int n) : initial_count(n), count(n) {};
 	parallel_queue(const parallel_queue&) = delete;
 	parallel_queue(parallel_queue&&) = delete;
 	parallel_queue& operator=(const parallel_queue&) = delete;
@@ -180,45 +139,54 @@ public:
 	void unlock() {
 		m.unlock();
 	}
-	void push(T item) {
+	void unsync_push(T item) {
 		q.push(item);
+		not_empty.notify_one();
 	}
-	[[nodiscard]] T pop() {
-		T r = std::move(q.front());
+	void push(T item) {
+		m.lock();
+		q.push(item);
+		not_empty.notify_one();
+		m.unlock();
+	}
+	[[nodiscard]] std::optional<T> pop() {
+		std::unique_lock<std::mutex> u(m);
+		if(q.empty()) {
+			if(--count == 0) {
+				for(int i = 0; i < initial_count; i++) {
+					q.push({}); // fixme
+				}
+				not_empty.notify_all();
+			} else {
+				not_empty.wait(u, [&](){return !q.empty();});
+				++count;
+			}
+		}
+		assert(!q.empty());
+		std::optional<T> r = std::move(q.front());
 		q.pop();
 		return r;
 	}
 	bool empty() {
+		m.lock();
 		bool e = q.empty();
+		m.unlock();
 		return e;
 	}
 	std::size_t size() {
-		std::size_t s = q.size();
-		return s;
-	}
-	void atomic_push(T item) {
-		m.lock();
-		q.push(item);
-		m.unlock();
-	}
-	[[nodiscard]] T atomic_pop() {
-		m.lock();
-		T r = std::move(q.front());
-		q.pop();
-		m.unlock();
-		return r;
-	}
-	bool atomic_empty() {
-		m.lock();
-		bool e = q.empty();
-		m.unlock();
-		return e;
-	}
-	std::size_t atomic_size() {
 		m.lock();
 		std::size_t s = q.size();
 		m.unlock();
 		return s;
+	}
+	void extern_post() {
+		std::unique_lock<std::mutex> u(m);
+		if(--count == 0) {
+			for(int i = 0; i < initial_count; i++) {
+				q.push({}); // fixme
+			}
+			not_empty.notify_all();
+		}
 	}
 };
 
