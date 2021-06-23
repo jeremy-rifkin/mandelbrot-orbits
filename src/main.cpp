@@ -1,23 +1,16 @@
-#include <assert.h>
 #include <algorithm>
+#include <assert.h>
 #include <atomic>
-#include <chrono>
 #include <complex>
-#include <condition_variable>
-#include <functional>
 #include <mutex>
 #include <optional>
-#include <queue>
 #include <random>
-#include <string>
 #include <stdint.h>
 #include <stdio.h>
 #include <thread>
-#include <unordered_set>
 #include <vector>
 
 #include "bmp.h"
-#include "kmeans.h"
 
 typedef double fp;
 
@@ -106,7 +99,7 @@ std::complex<fp> lambda(const int n, const std::complex<fp> z, const std::comple
 }
 
 bool is_period(const int n, std::complex<fp> z, const std::complex<fp> c) {
-	for(int i = 0; i < std::max(n, max_period); i++) {
+	for(int i = 0; i < max_period; i++) {
 		if(std::abs(lambda(n, z, c)) >= 1) {
 			return false;
 		}
@@ -231,7 +224,6 @@ void mariani_silver_worker(parallel_queue<std::tuple<int, int, int, int>>* _mq) 
 	parallel_queue<std::tuple<int, int, int, int>>& mq = *_mq;
 	while(let job = mq.pop()) {
 		let [i, j, w, h] = *job;
-		//printf("%d %d %d %d\n", i, j, w, h);
 		assert(w >= 0 && h >= 0);
 		if(w <= 4 || h <= 4) {
 			// an optimization but also handling an edge case where i + w/2 - 1 ==== i and cdiv(w, 2) + 1 ==== w
@@ -289,8 +281,6 @@ void AA_worker(BMP* _bmp, parallel_queue<std::pair<int, int>>* _aaq, std::mutex*
 		let [x, y] = get_coordinates(i, j);
 		let p = sample(x, y);
 		if(p != bmp.get(i, j)) { // no lock needed for reading
-			//let b = bmp.get(i, j);
-			//printf("{%d, %d, %d} != {%d, %d, %d}\n", p.r, p.g, p.b, b.r, b.g, b.b);
 			// no lock needed because only this thread should ever write to this pixel
 			bmp.set(i, j, p);
 			maskmutex.lock();
@@ -316,11 +306,9 @@ int main() {
 	assert(byte_swap(0x11223344) == 0x44332211);
 	assert(byte_swap(pixel_t{0x11, 0x22, 0x33}) == (pixel_t{0x33, 0x22, 0x11}));
 	// Render pipeline:
-	//   Mariani-silver figures out the mandelbrot main-body
+	//   Mariani-silver figures out the mandelbrot main-body (multi-producer multi-consumer thread pool)
 	//   Color translation
-	//   Edge detection ran to figure out where AA is needed
-	//   AA pass, parallel
-	//   Another pass to expose any missing detail as discovered by the AA pass
+	//   Edge detection / Exploratory anti-aliasing pass (multi-producer multi-consumer thread pool)
 	BMP bmp = BMP(w, h);
 	const int nthreads = std::thread::hardware_concurrency();
 	printf("parallel on %d threads\n", nthreads);
