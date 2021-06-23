@@ -3,6 +3,8 @@ TARGET_EXEC := mandelbrot.exe
 BUILD_DIR := bin
 SRC_DIRS := src
 
+all: $(BUILD_DIR)/$(TARGET_EXEC) README.md
+
 SRCS := $(shell find $(SRC_DIRS) -name *.cpp -or -name *.c)
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
 DEPS := $(OBJS:.o=.d)
@@ -54,7 +56,7 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 	$(MKDIR_P) $(dir $@)
 	$(CPP) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
-SCREENSHOTS := screenshots
+SCREENSHOTS := photos
 BMPS := $(shell find $(SCREENSHOTS) -name "*.bmp")
 PNGS := $(BMPS:.bmp=.png)
 
@@ -65,6 +67,9 @@ screenshots: $(PNGS)
 $(SCREENSHOTS)/%.png: SHELL:= bash
 $(SCREENSHOTS)/%.png: $(SCREENSHOTS)/%.bmp
 	bash -c "convert $^ $@"
+
+README.md: README_latex.md
+	markdown-math-gh-compiler README_latex.md -o README.md
 
 .PHONY: clean
 
