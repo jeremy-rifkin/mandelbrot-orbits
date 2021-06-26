@@ -56,16 +56,20 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 	$(MKDIR_P) $(dir $@)
 	$(CPP) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
-SCREENSHOTS := photos
-BMPS := $(shell find $(SCREENSHOTS) -name "*.bmp")
-PNGS := $(BMPS:.bmp=.png)
+# Warning: there are some issues here if file names have spaces in them
+BMP_DIR := photos/bmp
+PNG_DIR := photos/png
+BMPS := $(shell find $(BMP_DIR) -name "*.bmp")
+PNGS := $(BMPS:$(BMP_DIR)/%.bmp=$(PNG_DIR)/%.png)
 
 .PHONY: screenshots
 
 screenshots: $(PNGS)
 
-$(SCREENSHOTS)/%.png: SHELL:= bash
-$(SCREENSHOTS)/%.png: $(SCREENSHOTS)/%.bmp
+# The bash nonsense is a windows thing
+$(PNG_DIR)/%.png: SHELL:= bash
+$(PNG_DIR)/%.png: $(BMP_DIR)/%.bmp
+	$(MKDIR_P) $(dir $@)
 	bash -c "convert $^ $@"
 
 README.md: README_latex.md
