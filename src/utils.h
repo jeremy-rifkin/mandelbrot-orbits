@@ -27,55 +27,6 @@ template<typename T> T byte_swap(T t) {
 	return t;
 }
 
-// hash combining from https://stackoverflow.com/a/50978188/15675011
-
-template<typename T> T xorshift(const T& n, int i) {
-	return n^(n>>i);
-}
-
-inline uint32_t distribute(const uint32_t& n){
-	uint32_t p = 0x55555555ul;
-	uint32_t c = 3423571495ul;
-	return c*xorshift(p*xorshift(n,16),16);
-}
-
-inline uint64_t hash(const uint64_t& n){
-	uint64_t p = 0x5555555555555555;
-	uint64_t c = 17316035218449499591ull;
-	return c*xorshift(p*xorshift(n,32),32);
-}
-
-template <typename T,typename S>
-typename std::enable_if<std::is_unsigned<T>::value,T>::type
-constexpr rotl(const T n, const S i){
-	const T m = (std::numeric_limits<T>::digits-1);
-	const T c = i&m;
-	return (n<<c)|(n>>((T(0)-c)&m));
-}
-
-inline std::size_t hash_combine(std::size_t&& h1, std::size_t&& h2) {
-	return rotl(h1, std::numeric_limits<size_t>::digits / 3) ^ distribute(h2);
-}
-
-template<typename T> std::size_t count_unique(const std::vector<T>& vec) {
-	// https://quick-bench.com/q/I3Z3LSivDA18VW_8r9ytw3liBRI
-	if(vec.size() < 400) {
-		std::size_t unique = 0;
-		for(std::size_t i = 0; i < vec.size(); i++) {
-			for(std::size_t j = i + 1; j < vec.size(); j++) {
-				if(vec[i] == vec[j]) {
-					goto next;
-				}
-			}
-			unique++;
-			next:;
-		}
-		return unique;
-	} else {
-		return std::unordered_set<T>(vec.begin(), vec.end()).size();
-	}
-}
-
 // https://stackoverflow.com/questions/2353211/hsl-to-rgb-color-conversion
 /**
  * Converts an HSL color value to RGB. Conversion formula
@@ -190,6 +141,7 @@ public:
 	}
 };
 
+// might be flawed, but whatever
 template<typename T> struct atomic_optional {
 	union {
 		T item;

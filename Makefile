@@ -33,7 +33,7 @@ ifeq ($(TARGET), debug)
 		LDFLAGS += -fsanitize=address
 	endif
 else ifeq ($(TARGET), release)
-	CFLAGS += -O3 -funroll-loops -ftree-vectorize -ffast-math -flto -march=native #-DNDEBUG
+	CFLAGS += -O3 -funroll-loops -ftree-vectorize -ffast-math -flto -march=native -DNDEBUG
 	LDFLAGS += -s
 endif
 

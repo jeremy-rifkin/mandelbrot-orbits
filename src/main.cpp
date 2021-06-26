@@ -14,8 +14,8 @@
 
 typedef double fp;
 
-constexpr int w = 1920; // * 4;
-constexpr int h = 1080; // * 4;
+constexpr int w = 1920;
+constexpr int h = 1080;
 constexpr fp xmin = -2.5;
 constexpr fp xmax = 1;
 constexpr fp ymin = -1;
@@ -23,11 +23,12 @@ constexpr fp ymax = 1;
 constexpr fp dx = (xmax - xmin) / w;
 constexpr fp dy = (ymax - ymin) / h;
 
-constexpr int iterations = 7000; //10000 * 2; //5000;
-constexpr int max_period = 20;
+constexpr int iterations = 7000;
+// Note: this is just details. Higher values don't make the render slower.
+constexpr int max_period = 40;
 
 constexpr bool AA = true;
-constexpr int AA_samples = 10;
+constexpr int AA_samples = 20;
 constexpr int border_radius = 5;
 thread_local std::mt19937 rng;
 std::uniform_real_distribution<fp> ux(-dx/2, dx/2);
@@ -229,6 +230,7 @@ void mariani_silver_worker(parallel_queue<std::tuple<int, int, int, int>>* _mq) 
 			// an optimization but also handling an edge case where i + w/2 - 1 ==== i and cdiv(w, 2) + 1 ==== w
 			for(int x = i; x < i + w; x++) {
 				for(int y = j; y < j + h; y++) {
+					if(debug_info) ms_mask[x][y] = true;
 					points[x][y] = get_point(x, y);
 				}
 			}
@@ -277,23 +279,22 @@ void AA_worker(BMP* _bmp, parallel_queue<std::pair<int, int>>* _aaq, std::mutex*
 	auto T = std::tuple<BMP&, parallel_queue<std::pair<int, int>>&,  std::mutex&> { *_bmp, *_aaq, *_maskmutex };
 	auto& [bmp, aaq, maskmutex] = T;
 	while(let job = aaq.pop()) {
+		// Take a job and anti-alias the pixel
 		let [i, j] = *job;
 		let [x, y] = get_coordinates(i, j);
 		let p = sample(x, y);
 		if(p != bmp.get(i, j)) { // no lock needed for reading
 			// no lock needed because only this thread should ever write to this pixel
 			bmp.set(i, j, p);
+			// if anti-alias discovered new detail, queue neighboring pixels - mask ensures we don't
+			// queue a pixel multiple times.
 			maskmutex.lock();
 			for(int x = std::max(0, i - border_radius); x <= std::min(w - 1, i + border_radius); x++) {
 				for(int y = std::max(0, j - border_radius); y <= std::min(h - 1, j + border_radius); y++) {
 					if((x-i)*(x-i) + (y-j)*(y-j) > border_radius*border_radius) continue;
-					bool do_add = false;
 					if(!aa_mask[x][y]) {
-						do_add = true;
-						aa_mask[x][y] = true;
-					}
-					if(do_add) {
 						aaq.push({x, y});
+						aa_mask[x][y] = true;
 					}
 				}
 			}
