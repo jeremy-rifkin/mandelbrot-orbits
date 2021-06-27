@@ -178,6 +178,13 @@ compress them (losslessly) use imagemagick's `convert` tool.
 Here lie a bunch of visually cool results which resulted from failed attempts at solving this
 problem.
 
+![](photos/png/kmeans/test_20_m4.png)
+
+```
+k-means with some parameters I've forgotten xD
+more kmeans bugs in photos/(bmp|png)/kmeans
+```
+
 ![](photos/png/threshold/test.hmm.png)
 
 ```
@@ -186,6 +193,12 @@ Initial commit
 10 seed points
 float threshold = min_distance / 2;
 max 40 iterations
+```
+
+![](photos/png/threshold/test_bw_more_iters.png)
+
+```
+Low-iteration low-threshold
 ```
 
 ![](photos/png/threshold/test.edge.png)
@@ -200,8 +213,56 @@ any points which escape in the following 40 iterations get colored red
 ![](photos/png/threshold/test.edgenodiv2.png)
 
 ```
-Third commit
-40 iterations
-10 seed points
-any points which escape in the following 40 iterations get colored red
+Higher-fidelity threshold, third commit
+```
+
+![](photos/png/test.lambda.png)
+
+```
+Just coloring the main-body with a hard-coded equation
+```
+
+![](photos/png/test.first_success.png)
+
+```
+This was the first semi-successful render
+```
+
+![](photos/png/test.cooooool_result.1kiters.3col.png)
+
+```
+A bit more detected but period-detection still buggy
+```
+
+![](photos/png/test-aa.png)
+
+```
+Iirc here there was an issue with considering points which escaped at 40 iterations as part of the
+lambda calculation. The gray anomalies were detected as period 10 (value = 20 * period).
+```
+
+![](photos/png/test.interesting.png)
+
+```
+I forget what caused this
+```
+
+![](photos/png/test.interesting2.png)
+
+```
+I forget what caused this
+```
+
+![](photos/png/test.anotherinterestingone.png)
+
+```
+For some reason detail was detected but some bulbs didn't detect properly, I forget the reason.
+Notice how there are some small bulbs which are two or three colored. Interesting stuff.
+```
+
+![](photos/png/test.interesting3.png)
+
+```
+Low iteration render. Iterations have to be pretty high for high-resolution renders with this
+algorithm in order for points near the edge to converge properly.
 ```
