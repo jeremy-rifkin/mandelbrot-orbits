@@ -141,8 +141,21 @@ point_descriptor mandelbrot(fp x, fp y) {
 	return {false, 0, 0};
 }
 
-__attribute__((optimize("O1"))) // don't want ffast-math messing with this particular computation
-std::tuple<fp, fp> get_coordinates(int i, int j) {
+// So there's some interesting optimization stuff going on here.
+// This logic is pulled out because I haven't wanted -ffast-math effecting this computation.
+// Previously the function returned std::tuple<fp, fp>.
+// But it turns out [[gnu::optimize("-fno-fast-math")]] or [[gnu::optimize("-O3")]] resulted in
+// really bad codegen here when -ffast-math was provided on the command line (fine codegen
+// with just -O3 and not -ffast-math) because the call to the std::tuple constructor could not be
+// inlined as it did not have [[gnu::optimize("-fno-fast-math")]]. I find this cool but there's also
+// no way I know of to deal with it other than creating a type that won't have a constructor to
+// inline. https://godbolt.org/z/PffTGjbaY
+// Todo: Though it's not a big deal, this function can't be inlined into its callsites because of
+// the compiler trying to maintaining ffast-math consistency, is there a way to allow it to be? Will
+// it be done during LTO?
+struct not_a_tuple { fp i, j; };
+[[gnu::optimize("-fno-fast-math")]]// don't want ffast-math messing with this particular computation
+not_a_tuple get_coordinates(int i, int j) {
 	return {xmin + ((fp)i / w) * (xmax - xmin), ymin + ((fp)j / h) * (ymax - ymin)};
 }
 
