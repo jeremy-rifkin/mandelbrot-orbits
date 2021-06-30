@@ -14,6 +14,7 @@
 
 typedef double fp;
 
+// render parameters
 constexpr int w = 1920;
 constexpr int h = 1080;
 constexpr fp xmin = -2.5;
@@ -23,10 +24,12 @@ constexpr fp ymax = 1;
 constexpr fp dx = (xmax - xmin) / w;
 constexpr fp dy = (ymax - ymin) / h;
 
+// mandelbrot parameters
 constexpr int iterations = 7000;
 // Note: this is just details. Higher values don't make the render slower.
 constexpr int max_period = 40;
 
+// anti-aliasing settings
 constexpr bool AA = true;
 constexpr int AA_samples = 20;
 constexpr int border_radius = 5;
@@ -34,20 +37,22 @@ thread_local std::mt19937 rng;
 std::uniform_real_distribution<fp> ux(-dx/2, dx/2);
 std::uniform_real_distribution<fp> uy(-dy/2, dy/2);
 
+// set the render mode
 enum class render_mode { brute_force, mariani };
 constexpr render_mode mode = render_mode::mariani;
 
+// take escape time into account for mariani instead of just escaped or not escaped
+constexpr bool mariani_escape_time = true;
+
+// show where mariani / AA is done
 constexpr bool debug_info = false;
 
-// rng seed 0 works for this
-//const float h_start = 187;
-//const float h_stop = 277;
-// rng seed 2 is good for this
+// color starts/stops for the color table
 constexpr float h_start = 200;
 constexpr float h_stop = 330;
 
 pixel_t colors[max_period];
-__attribute__((constructor)) void init_colors() {
+[[gnu::constructor]] void init_colors() {
 	std::mt19937 rng(2);
 	std::uniform_real_distribution<fp> u(h_start, h_stop);
 	for(let& color : colors) {
@@ -61,18 +66,15 @@ struct point_descriptor {
 	int period;
 	point_descriptor(bool escaped, int escape_time, int period) : escaped(escaped), escape_time(escape_time), period(period) {}
 	bool operator==(const point_descriptor& other) const {
-		if(escaped) {
-			return other.escaped && escape_time == other.escape_time;
+		if(mariani_escape_time) {
+			return escaped ?
+			       other.escaped && escape_time == other.escape_time :
+			       period == other.period;
 		} else {
-			return period == other.period;
+			return escaped == other.escaped || period == other.period;
 		}
-		//return escaped == other.escaped && escape_time == other.escape_time && period == other.period;
-		//return (escape_time && other.escape_time) || period == other.period;
-		//return period == other.period;
 	}
-	bool operator!=(const point_descriptor& other) const {
-		return !operator==(other);
-	}
+	bool operator!=(const point_descriptor& other) const { return !operator==(other); }
 };
 
 // memoization
@@ -400,7 +402,6 @@ int main() {
 				}
 			}
 			aaq.extern_post();
-			puts("main posted"); // fixme: debug
 			for(let& t : thread_pool) {
 				t.join();
 			}
