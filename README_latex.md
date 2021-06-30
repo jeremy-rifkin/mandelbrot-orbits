@@ -264,5 +264,5 @@ Notice how there are some small bulbs which are two or three colored. Interestin
 
 ```
 Low iteration render. Iterations have to be pretty high for high-resolution renders with this
-algorithm in order for points near the edge to converge properly.
+algorithm in order for points near the edge to converge sufficiently.
 ```
