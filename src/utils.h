@@ -141,7 +141,6 @@ public:
 	}
 };
 
-// might be flawed, but whatever
 template<typename T> struct atomic_optional {
 	union {
 		T item;
@@ -149,14 +148,15 @@ template<typename T> struct atomic_optional {
 	std::atomic_bool _has_value = false;
 	atomic_optional() {}
 	~atomic_optional() {
-		if(_has_value) item.~T();
+		// todo: load here is a side-effect
+		if(_has_value.load(std::memory_order_acquire)) item.~T();
 	}
 	atomic_optional(const atomic_optional&) = delete;
 	atomic_optional(atomic_optional&&) = delete;
 	atomic_optional& operator=(const atomic_optional&) = delete;
 	atomic_optional& operator=(atomic_optional&&) = delete;
 	bool has_value() {
-		return _has_value;
+		return _has_value.load(std::memory_order_acquire);
 	}
 	const T value() {
 		return item;
@@ -164,10 +164,12 @@ template<typename T> struct atomic_optional {
 	const T operator*() {
 		return item;
 	}
+	//const T&& take() {}
+	//void clear()
 	void operator=(T _item) {
-		if(_has_value) item.~T();
+		if(_has_value.load(std::memory_order_acquire)) item.~T();
 		new (&item) T(_item);
-		_has_value = true; // seq_cst
+		_has_value.store(true, std::memory_order_release);
 	}
 };
 
