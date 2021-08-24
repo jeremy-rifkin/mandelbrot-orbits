@@ -44,17 +44,18 @@ threshold, while making a difference in the image, does not do anything to addre
 
 There's something cool about the threshold method: The produced image does have have some value in
 describing the "shape" of orbit trajectories. Darker color = more points/arms in the star/spiral
-drawn by plotting the trajectory. Not what I was trying to produce but still a cool result.
+drawn by plotting the trajectory. Not what I was trying to produce but still a cool result. I've
+explored this discovery more [here][0].
 
 ![](photos/etc/orbit.png)
-Graphic from [this][2] tool.
+Graphic from [this][1] tool.
 
 With both of these methods there is a lot of room for stuff to fall apart. They're both a little
 hacky and susceptible to noise and flawed heuristics.
 
 ## The Solution
 
-Nearly everything I've learned about the dynamics here is from a [lecture by Professor Benedetto][1]
+Nearly everything I've learned about the dynamics here is from a [lecture by Professor Benedetto][2]
 in 2014. Huge thanks to him for making his slides available online.
 
 TL;DR: There's actually a straightforward algorithm for figuring out the period of a point $c$ in
@@ -115,8 +116,9 @@ If after iterating $z_{n+1} = z_n^2 + c$ many times we haven't escaped then we'v
 root for $\phi_c^n$. In order to find $n$ we need to check all points in potential orbits of periods
 $n \in \{1, 2, ..., n_{max}\}$ to see if they are attractive points.
 
-[1]: https://rlbenedetto.people.amherst.edu/talks/mhc_ug14.pdf
-[2]: https://www.geogebra.org/m/Npd3kBKn
+[0]: https://github.com/jeremy-rifkin/mandelbrot-trajectories
+[1]: https://www.geogebra.org/m/Npd3kBKn
+[2]: https://rlbenedetto.people.amherst.edu/talks/mhc_ug14.pdf
 
 ## Rendering Optimizations
 

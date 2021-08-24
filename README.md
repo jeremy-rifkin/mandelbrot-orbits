@@ -43,7 +43,8 @@ threshold, while making a difference in the image, does not do anything to addre
 
 There's something cool about the threshold method: The produced image does have have some value in
 describing the "shape" of orbit trajectories. Darker color = more points/arms in the star/spiral
-drawn by plotting the trajectory. Not what I was trying to produce but still a cool result.
+drawn by plotting the trajectory. Not what I was trying to produce but still a cool result. I've
+explored this discovery more [here](https://github.com/jeremy-rifkin/mandelbrot-trajectories).
 
 ![](photos/etc/orbit.png)
 Graphic from [this](https://www.geogebra.org/m/Npd3kBKn) tool.
